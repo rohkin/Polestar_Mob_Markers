@@ -5,7 +5,7 @@
 ## Category: Polestar
 ## Group: Polestar
 ## Dependencies: LibForeverData, Polestar
-## IconTexture: Interface\AddOns\Polestar_Mob_Markers\icon
+## IconTexture: Interface\AddOns\Polestar\Media\Map\icon-kill
 ## SavedVariables: PolestarMobMarkersDB
 ## SavedVariablesPerCharacter: PolestarMobMarkersCharDB
 ## AddonCompartmentFunc: PolestarMobMarkers_OnAddonCompartmentClick

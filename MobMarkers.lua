@@ -46,7 +46,6 @@ end
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local MASK = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"
 local RING = "Interface\\AddOns\\Polestar_Mob_Markers\\ring%d.tga" -- 16, 32 and 64 px
-local ICON = "Interface\\AddOns\\Polestar_Mob_Markers\\icon.tga"
 local LEVEL = "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST"
 
 local function palette(k) return PALETTES[opt(k)] or PALETTES[DEFAULTS[k]] end
@@ -931,10 +930,15 @@ function refreshButton()
 		button:SetFrameLevel(Minimap:GetFrameLevel() + 8)
 		button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		button:RegisterForDrag("LeftButton")
-		-- The whole button is the addon's icon (icon.tga, also the .toc's IconTexture), shown as drawn.
-		local icon = button:CreateTexture(nil, "ARTWORK")
-		icon:SetTexture(ICON)
-		icon:SetAllPoints()
+		-- The button is a marker: Polestar's skull on its medallion, in the accent gold.
+		local medal = button:CreateTexture(nil, "ARTWORK", nil, 1)
+		medal:SetTexture(MEDAL)
+		medal:SetAllPoints()
+		local icon = button:CreateTexture(nil, "ARTWORK", nil, 2)
+		icon:SetTexture(SKULL)
+		icon:SetSize(BUTTON * SKULL_SCALE, BUTTON * SKULL_SCALE)
+		icon:SetPoint("CENTER")
+		icon:SetVertexColor(0.9, 0.73, 0.4)
 		button.icon = icon -- collectors (FlareUI) read the button's art from .icon
 		local hover = button:CreateTexture(nil, "HIGHLIGHT")
 		hover:SetTexture(WHITE)
