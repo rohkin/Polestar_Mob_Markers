@@ -72,7 +72,7 @@ assert(borderFor(fillFor(1), 1) ~= borderFor(fillFor(1), 2) and fillFor(1) ~= fi
 
 ---------------------------------------------------------------------------
 -- Marks: uiMapID -> { { x, y, fill, border, quest, mob, questID, objective, drop, key }, ... }
--- objective: the index of the quest's mob group (questGroups); drop: the item it drops, if any;
+-- objective: the index of its objective in the database quest (questGroups g.oi); drop: the item it drops, if any;
 -- key: "questID:objective", the legend's and the hidden list's key for it.
 ---------------------------------------------------------------------------
 
@@ -110,24 +110,44 @@ end
 
 -- A quest's objectives that need mobs, one group each: a kill objective is its mob; an item
 -- objective is every mob that drops it, together. { { label, drop = item name or nil, npcs = { id, ... } }, ... }
--- A mob in two objectives stays in the first, so it gets one marker.
+-- A mob in two objectives stays in the first, so it gets one marker. Objectives the quest log shows
+-- finished are left out.
+local PC = Polestar.Compat
+-- Whether the quest log shows the quest's oi-th database objective, named name, finished. Matched on
+-- the line's name as Polestar does (Engine Own.objectiveLine): the database's order is not the
+-- log's; the oi-th line when no name matches (another locale).
+local function objectiveDone(objs, oi, name)
+	for _, o in ipairs(objs) do
+		local l = PC.ObjectiveLabel(o.text)
+		if l ~= "" and (l == name or l:find(name, 1, true)) then return o.finished end
+	end
+	return objs[oi] and objs[oi].finished or false
+end
+-- The log's finished flags for a quest ("10"), so build() notices an objective finishing.
+local function doneSig(qid)
+	local s = ""
+	for _, o in ipairs(PC.GetQuestObjectives(qid) or {}) do s = s .. (o.finished and "1" or "0") end
+	return s
+end
 local function questGroups(qid)
 	local q = DB.Quest(qid)
+	local objs = PC.GetQuestObjectives(qid) or {} -- empty off the log (preview): nothing is left out
 	local groups, seen = {}, {}
-	local function group(label, drop, ids)
-		local g = { label = label, drop = drop, npcs = {} }
+	local function group(oi, label, drop, ids)
+		local g = { oi = oi, label = label, drop = drop, npcs = {} }
 		for _, id in ipairs(ids) do
 			if id and not seen[id] then seen[id] = true; g.npcs[#g.npcs + 1] = id end
 		end
 		if #g.npcs > 0 then groups[#groups + 1] = g end
 	end
-	for _, o in ipairs(q and q.objectives or {}) do
+	for oi, o in ipairs(q and q.objectives or {}) do
 		if o.kind == "kill" or o.kind == "npc" then
-			group(DB.Name("npc", o.target) or ("NPC " .. o.target), nil, { o.target })
+			local name = DB.Name("npc", o.target) or ("NPC " .. o.target)
+			if not objectiveDone(objs, oi, name) then group(oi, name, nil, { o.target }) end
 		elseif o.kind == "item" then
 			local it = DB.Get("item", o.target)
 			local name = it and it.name or ("Item " .. o.target)
-			group(name, name, it and it.npcDrops or {})
+			if not objectiveDone(objs, oi, name) then group(oi, name, name, it and it.npcDrops or {}) end
 		end
 	end
 	return groups, q and q.name
@@ -228,7 +248,7 @@ local lastSig
 local function build(force)
 	local list = opt("preview") and previewQuests(previewMap) or logQuests()
 	local ids = {}
-	for i, info in ipairs(list) do ids[i] = info.id end
+	for i, info in ipairs(list) do ids[i] = info.id .. ":" .. doneSig(info.id) end
 	local sig = table.concat(ids, ",") .. "|" .. opt("questPalette") .. "|" .. opt("mobPalette")
 	if not force and sig == lastSig then return false end
 	lastSig = sig
@@ -248,19 +268,19 @@ local function build(force)
 			for gi, g in ipairs(groups) do
 				-- One objective: nothing to tell apart, so the marker is the quest colour alone.
 				local border = #groups == 1 and fill or borderFor(fill, gi)
-				local key = qid .. ":" .. gi
-				entry.mobs[gi] = { id = gi, name = g.label, border = border }
+				local key = qid .. ":" .. g.oi -- the database objective: stays put as others finish, so hidden keys do too
+				entry.mobs[gi] = { id = g.oi, name = g.label, border = border }
 				for _, npcId in ipairs(g.npcs) do
 					local c = npcSpawns(npcId)
 					for mapID, pts in pairs(c.ui) do
 						local l = marks[mapID] or {}
 						marks[mapID] = l
 						for p = 1, #pts - 1, 2 do
-							l[#l + 1] = { pts[p], pts[p + 1], fill, border, entry.title, c.name, qid, gi, g.drop, key }
+							l[#l + 1] = { pts[p], pts[p + 1], fill, border, entry.title, c.name, qid, g.oi, g.drop, key }
 						end
 					end
 					for _, p in ipairs(c.world) do
-						local m = { p.x, p.y, fill, border, entry.title, c.name, qid, gi, g.drop, key }
+						local m = { p.x, p.y, fill, border, entry.title, c.name, qid, g.oi, g.drop, key }
 						local l = world[p.map] or {}
 						world[p.map] = l
 						l[#l + 1] = m
