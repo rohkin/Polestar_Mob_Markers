@@ -36,7 +36,7 @@ local PALETTE_ORDER = { "polestar", "rings", "vivid", "muted", "safe", "mono" }
 local HOLE = 1 / 1.3 -- the ring textures' hole is this fraction of their size (tools: the ring generator)
 -- Options panel values (sizes in px on screen, opacity in percent), saved in PolestarMobMarkersDB.
 local DEFAULTS = { worldSize = 10, minimapSize = 9, fillAlpha = 50, borderAlpha = 75, showWorld = true, showMinimap = true,
-	minimapButton = true, minimapButtonAngle = 225, showLegend = true, preview = false,
+	minimapButton = true, minimapButtonAngle = 225, showLegend = true, preview = false, stepOnly = true,
 	questPalette = "polestar", mobPalette = "polestar" }
 local function opt(k)
 	local v = PolestarMobMarkersDB and PolestarMobMarkersDB[k]
@@ -146,14 +146,29 @@ local function npcSpawns(id)
 	return c
 end
 
--- The quest log's open quests: { { id, title }, ... }.
+-- The quests Polestar's current guide step works on: its open goals that name a quest, accepts and
+-- hand-ins aside. nil when Polestar runs no guide, so the whole log shows.
+local function stepQuests()
+	local E = Polestar and Polestar.Engine
+	local view = E and E.GetStepView(E.GetStepIndex())
+	if not view then return nil end
+	local set = {}
+	for _, g in ipairs(view.goals or {}) do
+		if g.quest and g.t ~= "accept" and g.t ~= "turnin" and g.t ~= "abandon"
+			and g.status ~= "done" and g.status ~= "skipped" and g.status ~= "na" then set[g.quest] = true end
+	end
+	return set
+end
+
+-- The quest log's open quests (only the current step's, with "stepOnly"): { { id, title }, ... }.
 local function logQuests()
 	local out, QL = {}, C_QuestLog
+	local only = opt("stepOnly") and stepQuests()
 	local count = QL.GetNumQuestLogEntries and QL.GetNumQuestLogEntries() or GetNumQuestLogEntries()
 	for i = 1, count or 0 do
 		local info = QL.GetInfo(i)
 		local qid = info and not info.isHeader and not info.isHidden and info.questID
-		if qid and qid > 0 and not QL.IsComplete(qid) then out[#out + 1] = { id = qid, title = info.title } end
+		if qid and qid > 0 and not QL.IsComplete(qid) and (not only or only[qid]) then out[#out + 1] = { id = qid, title = info.title } end
 	end
 	return out
 end
@@ -798,6 +813,11 @@ local function rebuild(force)
 		mmDirty = true
 	end
 end
+local function queue()
+	if pending then return end
+	pending = true
+	C_Timer.After(0.2, rebuild)
+end
 
 local setupOptions, refreshButton -- options section, below
 
@@ -811,10 +831,10 @@ events:SetScript("OnEvent", function(_, event, name)
 	if event == "QUEST_TURNED_IN" then pruneHidden(name) end -- name: the questID here
 	if event == "ADDON_LOADED" and name ~= "Blizzard_WorldMap" then return end
 	install()
-	if pending then return end
-	pending = true
-	C_Timer.After(0.2, rebuild)
+	queue()
 end)
+-- Polestar's guide moving on changes which quests stepOnly shows.
+for _, msg in ipairs({ "STEP_CHANGED", "STEP_UPDATED", "GUIDE_CHANGED" }) do Polestar.On(msg, queue) end
 
 ---------------------------------------------------------------------------
 -- Options panel (Options > AddOns > Polestar: Mob Markers): changes apply live.
@@ -838,7 +858,7 @@ function setupOptions()
 				styleVer = styleVer + 1 -- and every marker repaints
 				if key == "minimapButton" then refreshButton() end
 				if key == "preview" then previewMap = nil end -- filled on the next world map draw
-				if key == "questPalette" or key == "mobPalette" or key == "preview" then rebuild(true) end -- colours are given out in build()
+				if key == "questPalette" or key == "mobPalette" or key == "preview" or key == "stepOnly" then rebuild(true) end -- colours are given out in build()
 			end)
 	end
 	local function checkbox(key, label, tip)
@@ -851,6 +871,7 @@ function setupOptions()
 	end
 	checkbox("showWorld", "Show on the world map", "Spawn markers on the world map.")
 	checkbox("showMinimap", "Show on the minimap", "Spawn markers on the minimap.")
+	checkbox("stepOnly", "Only Polestar's current step", "Marks only the quests Polestar's current guide step works on, not your whole quest log. With no guide running, the whole log shows.")
 	checkbox("preview", "Preview: full quest log (debug)", "Shows " .. PREVIEW_MAX .. " of your faction's quests for whatever zone the world map shows, as at peak use, instead of your quest log. Follows the map as you change zones; off again after a reload. Also /mobmarkers preview.")
 	checkbox("showLegend", "Legend on the world map", "Lists the quests and mobs on the shown map. Hover a row to highlight its markers, click it to turn them off or on.")
 	local function dropdown(key, label, choices, tip)

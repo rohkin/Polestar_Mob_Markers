@@ -32,6 +32,7 @@ Put the `Polestar_Mob_Markers` folder in `Interface\AddOns`.
 ![Options panel](screenshots/options.png)
 
 - Show on the world map and/or the minimap, and the world map legend.
+- Only Polestar's current step (on by default): mark just the quests the guide step you're on works on, instead of your whole quest log.
 - Colour palettes for quests and for mobs, including a colour-blind safe one.
 - Marker sizes for the world map and the minimap.
 - Medallion opacity, and skull & ring opacity.
