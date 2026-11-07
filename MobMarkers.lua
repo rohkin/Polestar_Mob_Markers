@@ -456,9 +456,9 @@ local function draw(relayout)
 	local s = 1 / ((map.GetCanvasScale and map:GetCanvasScale()) or 1)
 	local size = opt("worldSize") * s
 	drawSize, drawLevel = size, levelFor()
-	-- Markers of one objective closer than 3/4 of a medallion on screen share one: zoomed out a camp
-	-- is one mark, not dozens stacked, and zooming in brings them back. The legend counts them all.
-	local cell = size * MEDAL_SCALE * 0.75
+	-- Markers of one objective within 1.5 medallions on screen share one: zoomed out a camp is one
+	-- mark, not dozens stacked, and zooming in brings them back. The legend counts them all.
+	local cell = size * MEDAL_SCALE * 1.5
 	local taken = {}
 	local n = 0
 	local function place(m, u, v)
